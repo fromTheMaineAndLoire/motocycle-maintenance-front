@@ -1,0 +1,256 @@
+```yaml
+arazzo: 1.1.0
+
+info:
+  title: Honda CB750 Hornet Maintenance Workflows
+  summary: Workflows de maintenance pour Honda CB750 Hornet
+  description: |
+    Décrit les workflows de maintenance d'une Honda CB750 Hornet.
+    Exemple principal : vidange moteur avec remplacement du filtre à huile.
+  version: 1.0.0
+
+sourceDescriptions:
+
+  - name: maintenanceApi
+    url: ./maintenance-openapi.yaml
+    type: openapi
+
+workflows:
+
+  - workflowId: engineOilChange
+    summary: Réaliser une vidange moteur
+    description: |
+      Réalise le workflow complet d'une vidange moteur :
+      vérification de l'éligibilité, préparation, vidange,
+      remplacement du filtre, remplissage, contrôle du niveau
+      et enregistrement de l'intervention.
+
+    inputs:
+      type: object
+      required:
+        - motorcycleId
+        - mileage
+      properties:
+
+        motorcycleId:
+          type: string
+          description: Identifiant de la moto.
+
+        mileage:
+          type: integer
+          description: Kilométrage actuel de la moto.
+          minimum: 0
+
+        modelYear:
+          type: integer
+          description: Année modèle de la moto.
+
+        replaceOilFilter:
+          type: boolean
+          default: true
+          description: Remplacer également le filtre à huile.
+
+        technicianId:
+          type: string
+          description: Identifiant du technicien.
+
+    steps:
+
+      - stepId: loadMotorcycle
+        description: Charger les informations de la moto.
+        operationId: $sourceDescriptions.maintenanceApi.getMotorcycle
+        parameters:
+          - name: motorcycleId
+            in: path
+            value: $inputs.motorcycleId
+
+      - stepId: loadMaintenanceSpecification
+        description: |
+          Charger les données techniques correspondant exactement
+          au modèle et à l'année de la moto.
+        operationId: $sourceDescriptions.maintenanceApi.getMaintenanceSpecification
+        parameters:
+          - name: motorcycleId
+            in: path
+            value: $inputs.motorcycleId
+
+      - stepId: checkMaintenanceDue
+        description: |
+          Vérifier si la vidange est due selon le programme
+          d'entretien applicable à la moto.
+        operationId: $sourceDescriptions.maintenanceApi.checkMaintenanceDue
+        parameters:
+          - name: motorcycleId
+            in: path
+            value: $inputs.motorcycleId
+          - name: mileage
+            in: query
+            value: $inputs.mileage
+
+      - stepId: createMaintenanceJob
+        description: Créer l'intervention de maintenance.
+        operationId: $sourceDescriptions.maintenanceApi.createMaintenanceJob
+        requestBody:
+          content:
+            application/json:
+              schema:
+                type: object
+              value:
+                motorcycleId: $inputs.motorcycleId
+                type: oil-change
+                mileage: $inputs.mileage
+                technicianId: $inputs.technicianId
+
+      - stepId: prepareParts
+        description: |
+          Vérifier que l'huile, le filtre et le joint nécessaires
+          sont disponibles.
+        operationId: $sourceDescriptions.maintenanceApi.checkParts
+        parameters:
+          - name: motorcycleId
+            in: path
+            value: $inputs.motorcycleId
+
+      - stepId: warmEngine
+        description: |
+          Mettre le moteur à température normale avant la vidange,
+          conformément à la procédure de maintenance.
+        operationId: $sourceDescriptions.maintenanceApi.recordProcedureStep
+        requestBody:
+          content:
+            application/json:
+              schema:
+                type: object
+              value:
+                jobId: $steps.createMaintenanceJob.outputs.jobId
+                step: warm-engine
+                status: completed
+
+      - stepId: drainOil
+        description: |
+          Vidanger l'huile moteur dans un récipient approprié.
+        operationId: $sourceDescriptions.maintenanceApi.recordProcedureStep
+        requestBody:
+          content:
+            application/json:
+              schema:
+                type: object
+              value:
+                jobId: $steps.createMaintenanceJob.outputs.jobId
+                step: drain-oil
+                status: completed
+
+      - stepId: replaceOilFilter
+        description: Remplacer le filtre à huile si demandé.
+        operationId: $sourceDescriptions.maintenanceApi.recordProcedureStep
+        parameters:
+          - name: jobId
+            in: query
+            value: $steps.createMaintenanceJob.outputs.jobId
+        requestBody:
+          content:
+            application/json:
+              schema:
+                type: object
+              value:
+                step: replace-oil-filter
+                status: completed
+        criteria:
+          - condition: $inputs.replaceOilFilter == true
+
+      - stepId: installDrainPlug
+        description: |
+          Remonter le bouchon de vidange avec un joint neuf
+          et appliquer le couple spécifié par les données techniques.
+        operationId: $sourceDescriptions.maintenanceApi.recordProcedureStep
+        requestBody:
+          content:
+            application/json:
+              schema:
+                type: object
+              value:
+                jobId: $steps.createMaintenanceJob.outputs.jobId
+                step: install-drain-plug
+                torqueSpecification:
+                  value: $steps.loadMaintenanceSpecification.outputs.drainPlugTorque
+                  unit: Nm
+                status: completed
+
+      - stepId: fillEngine
+        description: |
+          Remplir le moteur avec l'huile correspondant aux
+          spécifications du modèle.
+        operationId: $sourceDescriptions.maintenanceApi.recordProcedureStep
+        requestBody:
+          content:
+            application/json:
+              schema:
+                type: object
+              value:
+                jobId: $steps.createMaintenanceJob.outputs.jobId
+                step: fill-engine
+                oil:
+                  viscosity: $steps.loadMaintenanceSpecification.outputs.oil.viscosity
+                  specification: $steps.loadMaintenanceSpecification.outputs.oil.specification
+                quantity:
+                  value: $steps.loadMaintenanceSpecification.outputs.oil.quantityWithFilter
+                  unit: L
+                status: completed
+
+      - stepId: checkOilLevel
+        description: |
+          Contrôler le niveau d'huile selon la procédure constructeur.
+        operationId: $sourceDescriptions.maintenanceApi.recordOilLevelCheck
+        requestBody:
+          content:
+            application/json:
+              schema:
+                type: object
+              value:
+                jobId: $steps.createMaintenanceJob.outputs.jobId
+
+      - stepId: checkLeaks
+        description: Contrôler l'absence de fuite après intervention.
+        operationId: $sourceDescriptions.maintenanceApi.recordInspection
+        requestBody:
+          content:
+            application/json:
+              schema:
+                type: object
+              value:
+                jobId: $steps.createMaintenanceJob.outputs.jobId
+                inspection: oil-leak
+                expectedResult: no-leak
+
+      - stepId: closeMaintenanceJob
+        description: Clôturer l'intervention et enregistrer la maintenance.
+        operationId: $sourceDescriptions.maintenanceApi.closeMaintenanceJob
+        requestBody:
+          content:
+            application/json:
+              schema:
+                type: object
+              value:
+                jobId: $steps.createMaintenanceJob.outputs.jobId
+                mileage: $inputs.mileage
+
+    outputs:
+
+      maintenanceJobId:
+        $steps.createMaintenanceJob.outputs.jobId
+
+      motorcycleId:
+        $inputs.motorcycleId
+
+      completedAt:
+        $steps.closeMaintenanceJob.outputs.completedAt
+
+      oilSpecification:
+        $steps.loadMaintenanceSpecification.outputs.oil
+
+      finalOilLevel:
+        $steps.checkOilLevel.outputs.level
+
+      leakInspection:
+        $steps.checkLeaks.outputs.result
+```
