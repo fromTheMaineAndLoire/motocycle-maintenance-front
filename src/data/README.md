@@ -1,19 +1,49 @@
 # Data Folder
 
-This folder contains static data files used by the application.
+This folder contains the source YAML data files for the application.
+
+**Important:** The actual YAML files used by the application are located in `/public/data/`. 
+This allows them to be fetched at runtime via HTTP requests.
+
+The files in this `src/data/` directory are the source files that should be copied to `/public/data/` for use in the application.
 
 ## Current Files
 
 - `hornet.750.vidange.arazzo.1.0.0.yaml` - Maintenance workflow definition for Honda CB750 Hornet oil change (vidange) procedures
 
-## Usage
+## File Structure
 
-These YAML files contain structured data that the React application imports and uses directly, eliminating the need for a backend database.
+All arazzo YAML files follow a similar structure:
 
-To use data from these files in your React components:
-
-```javascript
-import workflowData from './data/hornet.750.vidange.arazzo.1.0.0.yaml';
+```yaml
+arazzo: <version>
+info:
+  title: <title>
+  summary: <summary>
+  description: <description>
+  version: <version>
+workflows:
+  - workflowId: <id>
+    summary: <summary>
+    description: <description>
+    ...
 ```
 
-Note: You may need to configure a YAML loader in your webpack configuration or use a library like `js-yaml` to parse the files.
+## Usage
+
+YAML files in `/public/data/` can be fetched at runtime:
+
+```javascript
+fetch('/data/hornet.750.vidange.arazzo.1.0.0.yaml')
+  .then(response => response.text())
+  .then(text => {
+    const data = yaml.load(text);
+    // Use data
+  });
+```
+
+## Adding New Arazzo Files
+
+1. Create the YAML file in this `src/data/` folder
+2. Copy it to `/public/data/`
+3. Update the `loadArazzoFiles.js` utility to include the new file
