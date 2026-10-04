@@ -1,4 +1,4 @@
-import yaml from 'js-yaml';
+import { load } from 'js-yaml';
 
 /**
  * Load all arazzo YAML files from the public/data directory
@@ -20,7 +20,7 @@ export const loadArazzoFiles = async () => {
         const response = await fetch(`/data/${fileName}`);
         if (response.ok) {
           const text = await response.text();
-          const data = yaml.load(text);
+          const data = load(text);
           files.push(data);
         }
       } catch (e) {
