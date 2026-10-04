@@ -1,4 +1,3 @@
-```yaml
 arazzo: 1.1.0
 
 info:
@@ -253,4 +252,3 @@ workflows:
 
       leakInspection:
         $steps.checkLeaks.outputs.result
-```

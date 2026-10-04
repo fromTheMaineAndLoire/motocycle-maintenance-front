@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
 import Carousel from './components/Carousel';
+import ArazzoPage from './components/ArazzoPage';
 import { loadArazzoFiles } from './utils/loadArazzoFiles';
 import './App.css';
 
-function App() {
-  const [arazzoData, setArazzoData] = useState([]);
+function HomePage() {
+  const [arazzoData, setArazzoData] = useState({ data: [], filenames: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const data = await loadArazzoFiles();
-        setArazzoData(data);
+        const result = await loadArazzoFiles();
+        setArazzoData(result);
       } catch (error) {
         console.error('Failed to load arazzo data:', error);
       } finally {
@@ -24,22 +26,32 @@ function App() {
   }, []);
 
   return (
-    <div className="App">
+    <div className="home-page">
       <Header />
       
       <main className="main-content">
         {loading ? (
           <div className="loading">Loading...</div>
         ) : (
-          <Carousel items={arazzoData} />
+          <Carousel items={arazzoData.data} filenames={arazzoData.filenames} />
         )}
       </main>
       
       <footer className="footer">
-        {/* Footer will be designed later */}
-        <p>Footer placeholder</p>
+        <p>© 2024 Motocycle Maintenance. All rights reserved.</p>
       </footer>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/arazzo/:filename" element={<ArazzoPage />} />
+      </Routes>
+    </Router>
   );
 }
 
